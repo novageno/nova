@@ -13,4 +13,6 @@ def rescale_patient_images(image,org_spacing,target_spacing=(1,1,1)):
     image = scipy.ndimage.interpolation.zoom(image,real_size_factor,mode='nearest')
     
     return image
+
+
     

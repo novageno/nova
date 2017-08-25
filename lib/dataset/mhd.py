@@ -3,7 +3,8 @@ import ntpath
 import numpy as np
 import SimpleITK as sitk
 import data_utils
-from config import config
+import cv2
+#from config import config
 
 
 class MHD():
@@ -21,9 +22,9 @@ class MHD():
         
         itk_img = sitk.ReadImage(src_path)
         img_array = sitk.GetArrayFromImage(itk_img)
-        print('Img array:{}'.format(img_arrag.shape))
+        print('Img array:{}'.format(img_array.shape))
         
-        origin = np.array(itk_image.GetOrigin())
+        origin = np.array(itk_img.GetOrigin())
         print("Origin (x,y,z):",origin)
         
         direction = np.array(itk_img.GetDirection())
@@ -32,11 +33,11 @@ class MHD():
         spacing = np.array(itk_img.GetSpacing())
         print("Spacing (x,y,z):",spacing)
         
-        rescale = spacing / config.TARGET_VOXEL_MM
+        rescale = spacing / 1.00
         print("Rescale: ",rescale)
         
         #rescale to target voxel
-        img_array = data_utils.rescale_patient_images(img_array,spacing,config.TARGET_VOXEL_MM)
+        img_array = self.rescale_patient_images(img_array,spacing,1.00)
         img_array = self.normalize(img_array)
         img_array = img_array * 255.
         return img_array,patient_id
@@ -56,8 +57,54 @@ class MHD():
         stretchedVoxelCoord = np.absolute(worldCoord - origin)
         voxelCoord = stretchedVoxelCoord / spacing
         return voxelCoord
-
+    def rescale_patient_images(self,images_zyx, org_spacing_xyz, target_voxel_mm, is_mask_image=False, verbose=False):
+        if verbose:
+            print("Spacing: ", org_spacing_xyz)
+            print("Shape: ", images_zyx.shape)
+    
+        # print "Resizing dim z"
+        resize_x = 1.0
+        resize_y = float(org_spacing_xyz[2]) / float(target_voxel_mm)
+        interpolation = cv2.INTER_NEAREST if is_mask_image else cv2.INTER_LINEAR
+        res = cv2.resize(images_zyx, dsize=None, fx=resize_x, fy=resize_y, interpolation=interpolation)  # opencv assumes y, x, channels umpy array, so y = z pfff
+        # print "Shape is now : ", res.shape
+    
+        res = res.swapaxes(0, 2)
+        res = res.swapaxes(0, 1)
+        # print "Shape: ", res.shape
+        resize_x = float(org_spacing_xyz[0]) / float(target_voxel_mm)
+        resize_y = float(org_spacing_xyz[1]) / float(target_voxel_mm)
+    
+        # cv2 can handle max 512 channels..
+        if res.shape[2] > 512:
+            res = res.swapaxes(0, 2)
+            res1 = res[:256]
+            res2 = res[256:]
+            res1 = res1.swapaxes(0, 2)
+            res2 = res2.swapaxes(0, 2)
+            res1 = cv2.resize(res1, dsize=None, fx=resize_x, fy=resize_y, interpolation=interpolation)
+            res2 = cv2.resize(res2, dsize=None, fx=resize_x, fy=resize_y, interpolation=interpolation)
+            res1 = res1.swapaxes(0, 2)
+            res2 = res2.swapaxes(0, 2)
+            res = numpy.vstack([res1, res2])
+            res = res.swapaxes(0, 2)
+        else:
+            res = cv2.resize(res, dsize=None, fx=resize_x, fy=resize_y, interpolation=interpolation)
+    
+        # channels = cv2.split(res)
+        # resized_channels = []
+        # for channel in  channels:
+        #     channel = cv2.resize(channel, dsize=None, fx=resize_x, fy=resize_y)
+        #     resized_channels.append(channel)
+        # res = cv2.merge(resized_channels)
+        # print "Shape after resize: ", res.shape
+        res = res.swapaxes(0, 2)
+        res = res.swapaxes(2, 1)
+        if verbose:
+            print("Shape after: ", res.shape)
+        return res
     def anns_parser(self,anns_file_path):
         """annotation parser for csv file"""
         pass
-    def vis_nodule(self):        
+    def vis_nodule(self):
+        pass

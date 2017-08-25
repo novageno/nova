@@ -23,7 +23,7 @@ class Luna16(MHD):
         label_path: path to the preprocessed labels
         img_path: path to the preprocessed imgs
         """
-        super(Luna16,self).__init__("Luna16")
+        #super(Luna16,self).__init__("Luna16")
         self.data_path = data_path
         self.segment_path = segment_path
         self.anns_path = anns_path
@@ -42,9 +42,11 @@ class Luna16(MHD):
         
     def get_img(self,num_threads=None,img=True,dcm=True):
         print("Extracting images from LUNA16 Dataset")
+        
         for subdir in self.subsetdirs:
             src_dir = os.path.join(self.data_path,subdir)
-            src_paths = glob(src_dir+'*.mhd')
+            src_paths = glob(src_dir+'/*.mhd')
+        
             if num_threads:
                 pool = multiprocessing.pool(num_threads)
                 pool.map(self.process_image,src_paths)
@@ -54,11 +56,13 @@ class Luna16(MHD):
                     print("src Path: ",src_path)
                     img_array,patient_id = self.process_image(src_path)
                     if self.img:
-                        dst_dir = os.path.join(self.img_path,patient_id)
+                        #print(self.img_path)
+                        #dst_dir = os.path.join(self.img_path,str(patient_id))
+                        dst_dir = self.img_path + '/' + str(patient_id) + '/'
                         self.writetoimg(img_array,dst_dir)
                     if self.mhd:
-                        dst_dir = self.mhd_path + str(patient_id)
-                        self.writetodcm(img_array,dst_dir)
+                        dst_dir = self.mhd_path + '/' + str(patient_id)
+                        self.writetomhd(img_array,dst_dir)
                         
     def cube_builder(self,cube_size,perc):
         """
@@ -85,7 +89,7 @@ class Luna16(MHD):
             os.mkdir(dst_dir)
         for i in range(img_array.shape[0]):
             img = img_array[i]
-            cv2.imwrite(dst_dir + 'img_'+str(i).rjust(4,'0') + ".png",img * 255)
+            cv2.imwrite(dst_dir + 'img_'+str(i).rjust(4,'0') + ".png",img)
     def writetomhd(self,img_array,dst_dir):
         """
         write the prepocess data to dcm file for easy vis(using itk-snap)
@@ -123,3 +127,12 @@ class Luna16(MHD):
     def gt_roidb(self):
         """get the ground-truth roidb"""
         pass
+    
+if __name__=="__main__":
+    data_path = '/home/genonova/luna16'
+    anns_path = None
+    segment_path = '/home/genonova/seg-lungs-LUNA16'
+    result_path = '/home/genonova/data'
+    dataset= Luna16(data_path,anns_path,segment_path,result_path)
+    dataset.get_img()
+    dataset.get_lung_seg()
